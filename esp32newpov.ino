@@ -132,6 +132,8 @@ const bool apMode = false;
 
 
 CRGB leds[NUM_LEDS];
+CRGB leds1[NUM_LEDS];
+CRGB leds2[NUM_LEDS];
 
 const uint8_t brightnessCount = 5;
 uint8_t brightnessMap[brightnessCount] = { 16, 32, 64, 128, 255 };
@@ -285,8 +287,8 @@ void setup() {
  // FastLED.addLeds<LED_TYPE, DATA_PIN, CLK_PIN, COLOR_ORDER>(leds, NUM_LEDS); // for APA102 (Dotstar)
    attachInterrupt(digitalPinToInterrupt(sensor), ISR, CHANGE);
   FastLED.addLeds<LED_TYPE, DATA_PIN, CLOCK_PIN,COLOR_ORDER>(leds, NUM_LEDS);
-  FastLED.addLeds<LED_TYPE, DATA_PIN1, CLOCK_PIN1,COLOR_ORDER>(leds, NUM_LEDS);
-  FastLED.addLeds<LED_TYPE, DATA_PIN2, CLOCK_PIN2,COLOR_ORDER>(leds, NUM_LEDS);
+  FastLED.addLeds<LED_TYPE, DATA_PIN1, CLOCK_PIN1,COLOR_ORDER>(leds1, NUM_LEDS);
+  FastLED.addLeds<LED_TYPE, DATA_PIN2, CLOCK_PIN2,COLOR_ORDER>(leds2, NUM_LEDS);
   
   FastLED.setDither(false);
   FastLED.setCorrection(TypicalLEDStrip);
@@ -716,10 +718,10 @@ void printLetterb2(bool letter[])
 {
   for (int Pin = 0; Pin <= 7; Pin++) {
     if (letter[m2] == 1) {
-      leds[Pin] =  solidColor;
+      leds1[Pin] =  solidColor;
     }
     else {
-      leds[Pin] = CRGB::Black;
+      leds1[Pin] = CRGB::Black;
     }
     m2++;
   }
@@ -730,10 +732,10 @@ void printLetterb3(bool letter[])
 {
   for (int Pin = 0; Pin <= 7; Pin++) {
     if (letter[m3] == 1) {
-      leds[Pin] =  solidColor;
+      leds2[Pin] =  solidColor;
     }
     else {
-      leds[Pin] = CRGB::Black;
+      leds2[Pin] = CRGB::Black;
     }
     m3++;
   }
