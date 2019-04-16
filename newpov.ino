@@ -1,5 +1,4 @@
 
-
 #define FASTLED_INTERRUPT_RETRY_COUNT 0
 
 #include <FastLED.h>
@@ -39,20 +38,19 @@ ESP8266HTTPUpdateServer httpUpdateServer;
 
 #define DATA_PIN D1
 #define CLOCK_PIN D2
-#define DATA_PIN1 D3
-#define CLOCK_PIN1 D4
-#define DATA_PIN2 D5
-#define CLOCK_PIN2 D6
+#define DATA_PIN1 D5
+#define CLOCK_PIN1 D6
+#define DATA_PIN2 D3
+#define CLOCK_PIN2 D8
 #define LED_TYPE      APA102
 #define COLOR_ORDER   BGR
 #define NUM_LEDS      8
 
-char charBuff[60];//for time
-char charBuf[60]; //for text
+char charBuf[60]; //for text and time
 int i1 = 0, i2 = 0, i3 = 0;
 unsigned long T;
 int tempcount = 0;
-int tempvalue=0;
+int tempvalue = 0;
 
 bool alpha[38][48] = {
   {1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0}, //0
@@ -103,9 +101,9 @@ int toprint[22] = {17, 14, 21, 21, 24, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 3
 //#define BTW_BLADES 73000
 int fontsize = 2000;
 int max_dig = 23;
-int dottime=1000;
+int dottime = 1000;
 int ivalue = 0;
-int sensor = 16 ;
+int sensor = D7 ;
 int State = 0;
 int lastState = 0;
 bool mybool = 0;
@@ -172,7 +170,6 @@ CRGBPalette16 IceColors_p = CRGBPalette16(CRGB::Black, CRGB::Blue, CRGB::Aqua, C
 uint8_t currentPatternIndex = 0; // Index number of which pattern is current
 uint8_t autoplay = 0;
 uint8_t timedisp = 0;
-uint8_t text = 0;
 uint8_t autoplayDuration = 10;
 unsigned long autoPlayTimeout = 0;
 
@@ -239,7 +236,8 @@ PatternAndNameList patterns = {
   { fire,                   "Fire" },
   { water,                  "Water" },
 
-  { showSolidColor,         "Solid Color" }
+  { showSolidColor,         "Solid Color" },
+  {showPOV,         "POV Text"}
 };
 
 const uint8_t patternCount = ARRAY_SIZE(patterns);
@@ -284,17 +282,17 @@ void setup() {
   Serial.setDebugOutput(true);
 
   // FastLED.addLeds<LED_TYPE, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);         // for WS2812 (Neopixel)
- // FastLED.addLeds<LED_TYPE, DATA_PIN, CLK_PIN, COLOR_ORDER>(leds, NUM_LEDS); // for APA102 (Dotstar)
-   attachInterrupt(digitalPinToInterrupt(sensor), ISR, CHANGE);
-  FastLED.addLeds<LED_TYPE, DATA_PIN, CLOCK_PIN,COLOR_ORDER>(leds, NUM_LEDS);
-  FastLED.addLeds<LED_TYPE, DATA_PIN1, CLOCK_PIN1,COLOR_ORDER>(leds1, NUM_LEDS);
-  FastLED.addLeds<LED_TYPE, DATA_PIN2, CLOCK_PIN2,COLOR_ORDER>(leds2, NUM_LEDS);
-  
+  // FastLED.addLeds<LED_TYPE, DATA_PIN, CLK_PIN, COLOR_ORDER>(leds, NUM_LEDS); // for APA102 (Dotstar)
+  attachInterrupt(digitalPinToInterrupt(sensor), ISR, CHANGE);
+  FastLED.addLeds<LED_TYPE, DATA_PIN, CLOCK_PIN, COLOR_ORDER>(leds, NUM_LEDS);
+  FastLED.addLeds<LED_TYPE, DATA_PIN1, CLOCK_PIN1, COLOR_ORDER>(leds1, NUM_LEDS);
+  FastLED.addLeds<LED_TYPE, DATA_PIN2, CLOCK_PIN2, COLOR_ORDER>(leds2, NUM_LEDS);
+
   FastLED.setDither(false);
   FastLED.setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(brightness);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, MILLI_AMPS);
-  fill_solid(leds, NUM_LEDS, CRGB::Black);
+  fill_solid(leds, NUM_LEDS, CRGB::Black); fill_solid(leds1, NUM_LEDS, CRGB::Black); fill_solid(leds2, NUM_LEDS, CRGB::Black);
   FastLED.show();
   // Initialize a NTPClient to get time
   timeClient.begin();
@@ -384,34 +382,40 @@ void setup() {
     webServer.send(200, "text/json", newValue);
   });
   webServer.on("/action_page", HTTP_GET, []() {
-    String value = webServer.arg("text"); 
+    String value = webServer.arg("text");
     Serial.println(value);
     webServer.sendHeader("Location", "/");
     webServer.send(302, "text/plain", "Updated-- Press Back Button");
-   // setTextDisplay(value.toInt());
-    //sendInt(text);
     value.replace("%20", " ");
     value.toCharArray(charBuf, 70) ;
     Serial.println(value);
-if((value.length()>0)&&(tempcount<max_dig)){
-  for(int i=0; i<value.length(); i++){
-  tempvalue=charBuf[i];
-//  Serial.print(tempvalue);
-  if(tempvalue>64){tempvalue=tempvalue-65+10;
-  //Serial.print(tempvalue);
-  }
-  else if(tempvalue>47){ tempvalue=tempvalue-48;
-  //Serial.print(tempvalue);
-  }
-  else if (tempvalue==36){ 
-    for(;tempcount<max_dig;tempcount++){ toprint[tempcount]=36;}
-  } 
-  else if(tempvalue==32){tempvalue=36; }
-  if(tempcount<max_dig){ 
-    toprint[tempcount]=tempvalue;
-    Serial.print(toprint[tempcount]);
-  tempcount++;}
-  }}
+    if ((value.length() > 0) && (tempcount < max_dig)) {
+      for (int i = 0; i < value.length(); i++) {
+        tempvalue = charBuf[i];
+        //  Serial.print(tempvalue);
+        if (tempvalue > 64) {
+          tempvalue = tempvalue - 65 + 10;
+          //Serial.print(tempvalue);
+        }
+        else if (tempvalue > 47) {
+          tempvalue = tempvalue - 48;
+          //Serial.print(tempvalue);
+        }
+        else if (tempvalue == 36) {
+          for (; tempcount < max_dig; tempcount++) {
+            toprint[tempcount] = 36;
+          }
+        }
+        else if (tempvalue == 32) {
+          tempvalue = 36;
+        }
+        if (tempcount < max_dig) {
+          toprint[tempcount] = tempvalue;
+          Serial.print(toprint[tempcount]);
+          tempcount++;
+        }
+      }
+    }
   });
   webServer.on("/power", HTTP_POST, []() {
     String value = webServer.arg("value");
@@ -573,6 +577,8 @@ void loop() {
 
   if (power == 0) {
     fill_solid(leds, NUM_LEDS, CRGB::Black);
+    fill_solid(leds1, NUM_LEDS, CRGB::Black);
+    fill_solid(leds2, NUM_LEDS, CRGB::Black);
     FastLED.show();
     // FastLED.delay(15);
     return;
@@ -596,62 +602,6 @@ void loop() {
   //   Serial.print( F("Heap: ") ); Serial.println(system_get_free_heap_size());
   // }
 
-  //pov
-  if (State == HIGH) {
-    previous_micros1 = micros();
-    T = (previous_micros1 - previous_micros4) / 3.0;
-   // dottime = T / 73000.0 * fontsize;
-    
-    previous_micros4 = micros();
-    m1 = 0;
-    i1 = 0;
-    b1init = 0; b2init = 0; b3init = 0;
-    State = LOW;
-  }
-  current_micros = micros();
-
-  if (current_micros - previous_micros4 >= T) {
-    if (!b2init) {
-      i2 = 0;
-      m2 = 0;
-      b2init = 1;
-    }
-  }
-  if (current_micros - previous_micros4 >= (2 * T)) {
-    if (!b3init) {
-      i3 = 0;
-      m3 = 0;
-      b3init = 1;
-    }
-  }
-
-  if ((current_micros - previous_micros1 >= dottime) && (m1 < 48) && (i1 < 23)) {
-    printLetterb1(alpha[toprint[i1]]);
-    if (m1 >= 48) {
-      i1++;
-      m1 = 0;
-    }
-    previous_micros1 = micros();
-  }
-
-  if ((current_micros - previous_micros2 >= dottime) && (m2 < 48) && (i2 < 23)) {
-    printLetterb2(alpha[toprint[i2]]);
-    if (m2 >= 48) {
-      i2++;
-      m2 = 0;
-    }
-    previous_micros2 = micros();
-  }
-
-  if ((current_micros - previous_micros3 >= dottime) && (m3 < 48) && (i3 < 23)) {
-    printLetterb3(alpha[toprint[i3]]);
-    if (m3 >= 48) {
-      i3++;
-      m3 = 0;
-    }
-    previous_micros3 = micros();
-  }
-  lastState = State;
   // change to a new cpt-city gradient palette
   EVERY_N_SECONDS( secondsPerPalette ) {
     gCurrentPaletteNumber = addmod8( gCurrentPaletteNumber, 1, gGradientPaletteCount);
@@ -663,93 +613,55 @@ void loop() {
     nblendPaletteTowardPalette( gCurrentPalette, gTargetPalette, 8);
     gHue++;  // slowly cycle the "base color" through the rainbow
   }
-  if (timedisp == 1) {
+  // Call the current pattern function once, updating the 'leds' array
+
+  if (timedisp == 1 && currentPatternIndex == 30) {
     timeClient.update();
     String timeStamp = timeClient.getFormattedTime();
     Serial.println(timeStamp);
-     timeStamp.toCharArray(charBuff, 70) ;
-  if((timeStamp.length()>0)&&(tempcount<max_dig)){
-  for(int i=0; i<timeStamp.length(); i++){
-  tempvalue=charBuff[i];
- // Serial.println(tempvalue);
-  if(tempvalue>47&&tempvalue<58){ tempvalue=tempvalue-48;
-  }
-  else if (tempvalue==36){ 
-    for(;tempcount<max_dig;tempcount++){ toprint[tempcount]=36;}
-  } 
-  else if(tempvalue==32){tempvalue=36;}
-   else if(tempvalue==58){tempvalue=37;}
-  if(tempcount<max_dig){ 
-    toprint[tempcount]=tempvalue;
-    Serial.print(toprint[tempcount]);
-  tempcount++;}
-  }}
-if(tempcount>=max_dig){tempcount=0;}
     delay(1000);
-  }  
+    timeStamp.toCharArray(charBuf, 70) ;
+    if ((timeStamp.length() > 0) && (tempcount < max_dig)) {
+      for (int i = 0; i < timeStamp.length(); i++) {
+        tempvalue = charBuf[i];
+        // Serial.println(tempvalue);
+        if (tempvalue > 47 && tempvalue < 58) {
+          tempvalue = tempvalue - 48;
+        }
+        else if (tempvalue == 36) {
+          for (; tempcount < max_dig; tempcount++) {
+            toprint[tempcount] = 36;
+          }
+        }
+        else if (tempvalue == 32) {
+          tempvalue = 36;
+        }
+        else if (tempvalue == 58) {
+          tempvalue = 37;
+        }
+        if (tempcount < max_dig) {
+          toprint[tempcount] = tempvalue;
+          Serial.print(toprint[tempcount]);
+          tempcount++;
+        }
+      }
+    }
+    if (tempcount >= max_dig) {
+      tempcount = 0;
+    }
+  }
   if (autoplay && (millis() > autoPlayTimeout)) {
     adjustPattern(true);
     autoPlayTimeout = millis() + (autoplayDuration * 1000);
   }
-
-  // Call the current pattern function once, updating the 'leds' array
   patterns[currentPatternIndex].pattern();
 
   FastLED.show();
 
   // insert a delay to keep the framerate modest
-  FastLED.delay(1000 / FRAMES_PER_SECOND);
-}
-void printLetterb1(bool letter[])
-{
-  for (int Pin = 0; Pin <= 7; Pin++) {
-    if (letter[m1] == 1) {
-      leds[Pin] =  solidColor;
-    }
-    else {
-      leds[Pin] = CRGB::Black;
-    }
-    m1++;
-  }
-  FastLED.show();
+ // FastLED.delay(1000 / FRAMES_PER_SECOND);
 }
 
-void printLetterb2(bool letter[])
-{
-  for (int Pin = 0; Pin <= 7; Pin++) {
-    if (letter[m2] == 1) {
-      leds1[Pin] =  solidColor;
-    }
-    else {
-      leds1[Pin] = CRGB::Black;
-    }
-    m2++;
-  }
-  FastLED.show();
-}
-
-void printLetterb3(bool letter[])
-{
-  for (int Pin = 0; Pin <= 7; Pin++) {
-    if (letter[m3] == 1) {
-      leds2[Pin] =  solidColor;
-    }
-    else {
-      leds2[Pin] = CRGB::Black;
-    }
-    m3++;
-  }
-  FastLED.show();
-}
-
-void ISR ()
-{
-  if (mybool == 0) {
-    State = 1;
-    mybool = 1;
-  }
-  else mybool = 0;
-}
 void loadSettings()
 {
   brightness = EEPROM.read(0);
@@ -772,7 +684,6 @@ void loadSettings()
     solidColor = CRGB(r, g, b);
   }
 
-  text = EEPROM.read(4);
   power = EEPROM.read(5);
 
   autoplay = EEPROM.read(6);
@@ -825,15 +736,6 @@ void setTimeDisplay(uint8_t value)
   EEPROM.commit();
 
   broadcastInt("timedisp", timedisp);
-}
-
-void setTextDisplay(uint8_t value)
-{
-  text = value;
-  EEPROM.write(4, text);
-  EEPROM.commit();
-
-  broadcastInt("text", text);
 }
 
 void setSolidColor(CRGB color)
@@ -969,22 +871,132 @@ void strandTest()
       i = 0;
   }
 
-  fill_solid(leds, NUM_LEDS, CRGB::Black);
+  fill_solid(leds, NUM_LEDS, CRGB::Black); fill_solid(leds1, NUM_LEDS, CRGB::Black); fill_solid(leds2, NUM_LEDS, CRGB::Black);
 
-  leds[i] = solidColor;
+  leds[i] = solidColor; leds1[i] = solidColor; leds2[i] = solidColor;
 }
 
 void showSolidColor()
 {
-  fill_solid(leds, NUM_LEDS, solidColor);
+  fill_solid(leds, NUM_LEDS, solidColor);  
+  fill_solid(leds1, NUM_LEDS, solidColor); 
+  fill_solid(leds2, NUM_LEDS, solidColor);
+}
+void showPOV()
+{
+  //pov
+  if (State == HIGH) {
+    previous_micros1 = micros();
+    T = (previous_micros1 - previous_micros4) / 3.0;
+    dottime = T / 73000.0 * fontsize;
+
+    previous_micros4 = micros();
+    m1 = 0;
+    i1 = 0;
+    b1init = 0; b2init = 0; b3init = 0;
+    State = LOW;
+  }
+  current_micros = micros();
+
+  if (current_micros - previous_micros4 >= T) {
+    if (!b2init) {
+      i2 = 0;
+      m2 = 0;
+      b2init = 1;
+    }
+  }
+  if (current_micros - previous_micros4 >= (2 * T)) {
+    if (!b3init) {
+      i3 = 0;
+      m3 = 0;
+      b3init = 1;
+    }
+  }
+
+  if ((current_micros - previous_micros1 >= dottime) && (m1 < 48) && (i1 < 23)) {
+    printLetterb1(alpha[toprint[i1]]);
+    if (m1 >= 48) {
+      i1++;
+      m1 = 0;
+    }
+    previous_micros1 = micros();
+  }
+
+  if ((current_micros - previous_micros2 >= dottime) && (m2 < 48) && (i2 < 23)) {
+    printLetterb2(alpha[toprint[i2]]);
+    if (m2 >= 48) {
+      i2++;
+      m2 = 0;
+    }
+    previous_micros2 = micros();
+  }
+
+  if ((current_micros - previous_micros3 >= dottime) && (m3 < 48) && (i3 < 23)) {
+    printLetterb3(alpha[toprint[i3]]);
+    if (m3 >= 48) {
+      i3++;
+      m3 = 0;
+    }
+    previous_micros3 = micros();
+  }
+  lastState = State;
+}
+void printLetterb1(bool letter[])
+{
+  for (int Pin = 0; Pin <= 7; Pin++) {
+    if (letter[m1] == 1) {
+      leds[Pin] =  solidColor;
+    }
+    else {
+      leds[Pin] = CRGB::Black;
+    }
+    m1++;
+  }
+  FastLED.show();
 }
 
+void printLetterb2(bool letter[])
+{
+  for (int Pin = 0; Pin <= 7; Pin++) {
+    if (letter[m2] == 1) {
+      leds1[Pin] =  solidColor;
+    }
+    else {
+      leds1[Pin] = CRGB::Black;
+    }
+    m2++;
+  }
+  FastLED.show();
+}
+
+void printLetterb3(bool letter[])
+{
+  for (int Pin = 0; Pin <= 7; Pin++) {
+    if (letter[m3] == 1) {
+      leds2[Pin] =  solidColor;
+    }
+    else {
+      leds2[Pin] = CRGB::Black;
+    }
+    m3++;
+  }
+  FastLED.show();
+}
+
+void ISR ()
+{
+  if (mybool == 0) {
+    State = 1;
+    mybool = 1;
+  }
+  else mybool = 0;
+}
 // Patterns from FastLED example DemoReel100: https://github.com/FastLED/FastLED/blob/master/examples/DemoReel100/DemoReel100.ino
 
 void rainbow()
 {
   // FastLED's built-in rainbow generator
-  fill_rainbow( leds, NUM_LEDS, gHue, 255 / NUM_LEDS);
+  fill_rainbow( leds, NUM_LEDS, gHue, 255 / NUM_LEDS); fill_rainbow( leds1, NUM_LEDS, gHue, 255 / NUM_LEDS); fill_rainbow( leds2, NUM_LEDS, gHue, 255 / NUM_LEDS);
 }
 
 void rainbowWithGlitter()
@@ -996,29 +1008,31 @@ void rainbowWithGlitter()
 
 void rainbowSolid()
 {
-  fill_solid(leds, NUM_LEDS, CHSV(gHue, 255, 255));
+  fill_solid(leds, NUM_LEDS, CHSV(gHue, 255, 255));  fill_solid(leds1, NUM_LEDS, CHSV(gHue, 255, 255)); fill_solid(leds2, NUM_LEDS, CHSV(gHue, 255, 255));
 }
 
 void confetti()
 {
   // random colored speckles that blink in and fade smoothly
-  fadeToBlackBy( leds, NUM_LEDS, 10);
+  fadeToBlackBy( leds, NUM_LEDS, 10); fadeToBlackBy( leds1, NUM_LEDS, 10); fadeToBlackBy( leds2, NUM_LEDS, 10);
   int pos = random16(NUM_LEDS);
   // leds[pos] += CHSV( gHue + random8(64), 200, 255);
   leds[pos] += ColorFromPalette(palettes[currentPaletteIndex], gHue + random8(64));
+  leds1[pos] += ColorFromPalette(palettes[currentPaletteIndex], gHue + random8(64));
+  leds2[pos] += ColorFromPalette(palettes[currentPaletteIndex], gHue + random8(64));
 }
 
 void sinelon()
 {
   // a colored dot sweeping back and forth, with fading trails
-  fadeToBlackBy( leds, NUM_LEDS, 20);
+  fadeToBlackBy( leds, NUM_LEDS, 20); fadeToBlackBy( leds1, NUM_LEDS, 20); fadeToBlackBy( leds2, NUM_LEDS, 20);
   int pos = beatsin16(speed, 0, NUM_LEDS);
   static int prevpos = 0;
   CRGB color = ColorFromPalette(palettes[currentPaletteIndex], gHue, 255);
   if ( pos < prevpos ) {
-    fill_solid( leds + pos, (prevpos - pos) + 1, color);
+    fill_solid( leds + pos, (prevpos - pos) + 1, color); fill_solid( leds1 + pos, (prevpos - pos) + 1, color); fill_solid( leds2 + pos, (prevpos - pos) + 1, color);
   } else {
-    fill_solid( leds + prevpos, (pos - prevpos) + 1, color);
+    fill_solid( leds + prevpos, (pos - prevpos) + 1, color); fill_solid( leds1 + prevpos, (pos - prevpos) + 1, color); fill_solid( leds2 + prevpos, (pos - prevpos) + 1, color);
   }
   prevpos = pos;
 }
@@ -1030,6 +1044,12 @@ void bpm()
   CRGBPalette16 palette = palettes[currentPaletteIndex];
   for ( int i = 0; i < NUM_LEDS; i++) {
     leds[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
+  }
+  for ( int i = 0; i < NUM_LEDS; i++) {
+    leds1[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
+  }
+  for ( int i = 0; i < NUM_LEDS; i++) {
+    leds2[i] = ColorFromPalette(palette, gHue + (i * 2), beat - gHue + (i * 10));
   }
 }
 
@@ -1059,10 +1079,20 @@ void juggle()
 
   // Several colored dots, weaving in and out of sync with each other
   curhue = thishue; // Reset the hue values.
-  fadeToBlackBy(leds, NUM_LEDS, faderate);
+  fadeToBlackBy(leds, NUM_LEDS, faderate);  fadeToBlackBy(leds1, NUM_LEDS, faderate);  fadeToBlackBy(leds2, NUM_LEDS, faderate);
   for ( int i = 0; i < numdots; i++) {
     //beat16 is a FastLED 3.1 function
     leds[beatsin16(basebeat + i + numdots, 0, NUM_LEDS)] += CHSV(gHue + curhue, thissat, thisbright);
+    curhue += hueinc;
+  }
+  for ( int i = 0; i < numdots; i++) {
+    //beat16 is a FastLED 3.1 function
+    leds1[beatsin16(basebeat + i + numdots, 0, NUM_LEDS)] += CHSV(gHue + curhue, thissat, thisbright);
+    curhue += hueinc;
+  }
+  for ( int i = 0; i < numdots; i++) {
+    //beat16 is a FastLED 3.1 function
+    leds2[beatsin16(basebeat + i + numdots, 0, NUM_LEDS)] += CHSV(gHue + curhue, thissat, thisbright);
     curhue += hueinc;
   }
 }
@@ -1117,7 +1147,7 @@ void pride()
     uint16_t pixelnumber = i;
     pixelnumber = (NUM_LEDS - 1) - pixelnumber;
 
-    nblend( leds[pixelnumber], newcolor, 64);
+    nblend( leds[pixelnumber], newcolor, 64); nblend( leds1[pixelnumber], newcolor, 64); nblend( leds2[pixelnumber], newcolor, 64);
   }
 }
 
@@ -1127,13 +1157,21 @@ void radialPaletteShift()
     // leds[i] = ColorFromPalette( gCurrentPalette, gHue + sin8(i*16), brightness);
     leds[i] = ColorFromPalette(gCurrentPalette, i + gHue, 255, LINEARBLEND);
   }
+  for (uint16_t i = 0; i < NUM_LEDS; i++) {
+    // leds1[i] = ColorFromPalette( gCurrentPalette, gHue + sin8(i*16), brightness);
+    leds1[i] = ColorFromPalette(gCurrentPalette, i + gHue, 255, LINEARBLEND);
+  }
+  for (uint16_t i = 0; i < NUM_LEDS; i++) {
+    // leds2[i] = ColorFromPalette( gCurrentPalette, gHue + sin8(i*16), brightness);
+    leds2[i] = ColorFromPalette(gCurrentPalette, i + gHue, 255, LINEARBLEND);
+  }
 }
 
 // based on FastLED example Fire2012WithPalette: https://github.com/FastLED/FastLED/blob/master/examples/Fire2012WithPalette/Fire2012WithPalette.ino
 void heatMap(CRGBPalette16 palette, bool up)
 {
   fill_solid(leds, NUM_LEDS, CRGB::Black);
-
+  fill_solid(leds1, NUM_LEDS, CRGB::Black);  fill_solid(leds2, NUM_LEDS, CRGB::Black);
   // Add entropy to random number generator; we use a lot of it.
   random16_add_entropy(random(256));
 
@@ -1167,10 +1205,10 @@ void heatMap(CRGBPalette16 palette, bool up)
     CRGB color = ColorFromPalette(palette, colorindex);
 
     if (up) {
-      leds[j] = color;
+      leds[j] = color; leds1[j] = color; leds2[j] = color;
     }
     else {
-      leds[(NUM_LEDS - 1) - j] = color;
+      leds[(NUM_LEDS - 1) - j] = color; leds1[(NUM_LEDS - 1) - j] = color; leds2[(NUM_LEDS - 1) - j] = color;
     }
   }
 }
@@ -1178,7 +1216,7 @@ void heatMap(CRGBPalette16 palette, bool up)
 void addGlitter( uint8_t chanceOfGlitter)
 {
   if ( random8() < chanceOfGlitter) {
-    leds[ random16(NUM_LEDS) ] += CRGB::White;
+    leds[ random16(NUM_LEDS) ] += CRGB::White; leds1[ random16(NUM_LEDS) ] += CRGB::White; leds2[ random16(NUM_LEDS) ] += CRGB::White;
   }
 }
 
@@ -1203,7 +1241,7 @@ uint8_t beatsaw8( accum88 beats_per_minute, uint8_t lowest = 0, uint8_t highest 
 
 void colorWaves()
 {
-  colorwaves( leds, NUM_LEDS, gCurrentPalette);
+  colorwaves( leds, NUM_LEDS, gCurrentPalette); colorwaves( leds1, NUM_LEDS, gCurrentPalette); colorwaves( leds2, NUM_LEDS, gCurrentPalette);
 }
 
 // ColorWavesWithPalettes by Mark Kriegsman: https://gist.github.com/kriegsman/8281905786e8b2632aeb
