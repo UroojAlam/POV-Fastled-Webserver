@@ -56,12 +56,20 @@ void brightenOrDarkenEachPixel( fract8 fadeUpAmount, fract8 fadeDownAmount)
   for ( uint16_t i = 0; i < NUM_LEDS; i++) {
     if ( getPixelDirection(i) == GETTING_DARKER) {
       // This pixel is getting darker
-      leds[i] = makeDarker( leds[i], fadeDownAmount);
+      leds[i] = makeDarker( leds[i], fadeDownAmount);leds1[i] = makeDarker( leds1[i], fadeDownAmount);leds2[i] = makeDarker( leds2[i], fadeDownAmount);
     } else {
       // This pixel is getting brighter
-      leds[i] = makeBrighter( leds[i], fadeUpAmount);
+      leds[i] = makeBrighter( leds[i], fadeUpAmount);  leds1[i] = makeBrighter( leds1[i], fadeUpAmount);  leds2[i] = makeBrighter( leds2[i], fadeUpAmount);
       // now check to see if we've maxxed out the brightness
       if ( leds[i].r == 255 || leds[i].g == 255 || leds[i].b == 255) {
+        // if so, turn around and start getting darker
+        setPixelDirection(i, GETTING_DARKER);
+      }
+        if ( leds1[i].r == 255 || leds1[i].g == 255 || leds1[i].b == 255) {
+        // if so, turn around and start getting darker
+        setPixelDirection(i, GETTING_DARKER);
+      }
+        if ( leds2[i].r == 255 || leds2[i].g == 255 || leds2[i].b == 255) {
         // if so, turn around and start getting darker
         setPixelDirection(i, GETTING_DARKER);
       }
@@ -82,6 +90,8 @@ void colortwinkles()
       int pos = random16(NUM_LEDS);
       if ( !leds[pos]) {
         leds[pos] = ColorFromPalette( gCurrentPalette, random8(), STARTING_BRIGHTNESS, NOBLEND);
+        leds1[pos] = ColorFromPalette( gCurrentPalette, random8(), STARTING_BRIGHTNESS, NOBLEND);
+        leds2[pos] = ColorFromPalette( gCurrentPalette, random8(), STARTING_BRIGHTNESS, NOBLEND);
         setPixelDirection(pos, GETTING_BRIGHTER);
       }
     }
@@ -115,4 +125,3 @@ void incandescentTwinkles()
   gCurrentPalette = CRGBPalette16( l, l, l, l, l, l, l, l, l, l, l, l, l, l, l, l );
   colortwinkles();
 }
-
