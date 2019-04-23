@@ -46,14 +46,14 @@ ESP8266HTTPUpdateServer httpUpdateServer;
 #define COLOR_ORDER   BGR
 #define NUM_LEDS      8
 
-char charBuf[60]; //for text and time
+char charBuf[60]; //for text
 int i1 = 0, i2 = 0, i3 = 0;
 unsigned long T;
 int tempcount = 0;
 int tempvalue = 0;
 
 bool alpha[38][48] = {
-  {1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0}, //0
+  {0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0}, //0
   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0}, //1
   {1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0}, //2
   {1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0}, //3
@@ -93,7 +93,7 @@ bool alpha[38][48] = {
   {1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0}, //Z=35
 
   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},//Empty = 36
-  {0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}//:=37
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}//:=37
 };
 
 int toprint[22] = {17, 14, 21, 21, 24, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36};
@@ -101,7 +101,7 @@ int toprint[22] = {17, 14, 21, 21, 24, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 3
 //#define BTW_BLADES 73000
 int fontsize = 2000;
 int max_dig = 23;
-int dottime = 1000;
+int dottime;
 int ivalue = 0;
 int sensor = D7 ;
 int State = 0;
@@ -111,7 +111,7 @@ unsigned long current_micros;
 unsigned long previous_micros1 = 0, previous_micros2 = 0, previous_micros3 = 0, previous_micros4 = 0;
 int m1 = 0, m2 = 0, m3 = 0;
 bool b1init = 0, b2init = 0, b3init = 0;
-
+void sendText();
 
 #define MILLI_AMPS         2000 // IMPORTANT: set the max milli-Amps of your power supply (4A = 4000mA)
 #define FRAMES_PER_SECOND  120  // here you can control the speed. With the Access Point / Web Server the animations run a bit slower.
@@ -384,12 +384,20 @@ void setup() {
   webServer.on("/action_page", HTTP_GET, []() {
     String value = webServer.arg("text");
     Serial.println(value);
-    webServer.sendHeader("Location", "/");
-    webServer.send(302, "text/plain", "Updated-- Press Back Button");
     value.replace("%20", " ");
     value.toCharArray(charBuf, 70) ;
     Serial.println(value);
-    if ((value.length() > 0) && (tempcount < max_dig)) {
+    sendText(value);
+    String value1 = webServer.arg("quantity"); 
+    Serial.println(value1);
+    webServer.sendHeader("Location", "/");
+    webServer.send(302, "text/plain", "Updated-- Press Back Button");
+    fontsize=value1.toInt();
+    Serial.println("fontsize: ");
+    Serial.println(fontsize);
+    webServer.sendHeader("Location", "/");
+    webServer.send(302, "text/plain", "Updated-- Press Back Button");
+  /*  if ((value.length() > 0) && (tempcount < max_dig)) {
       for (int i = 0; i < value.length(); i++) {
         tempvalue = charBuf[i];
         //  Serial.print(tempvalue);
@@ -416,6 +424,9 @@ void setup() {
         }
       }
     }
+    if (tempcount >= max_dig) {
+      tempcount = 0;
+    }*/
   });
   webServer.on("/power", HTTP_POST, []() {
     String value = webServer.arg("value");
@@ -538,6 +549,17 @@ void setup() {
   webServer.begin();
   Serial.println("HTTP web server started");
 
+  static bool hasConnected = false;
+  if (WiFi.status() != WL_CONNECTED) {
+      //      Serial.printf("Connecting to %s\n", ssid);
+      hasConnected = false;
+    }
+    else if(!hasConnected) {
+      hasConnected = true;
+      Serial.print("Connected! Open http://");
+      Serial.print(WiFi.localIP());
+      Serial.println(" in your browser");
+    }
   //  webSocketsServer.begin();
   //  webSocketsServer.onEvent(webSocketEvent);
   //  Serial.println("Web socket server started");
@@ -583,72 +605,31 @@ void loop() {
     // FastLED.delay(15);
     return;
   }
-
-  static bool hasConnected = false;
-  EVERY_N_SECONDS(1) {
-    if (WiFi.status() != WL_CONNECTED) {
-      //      Serial.printf("Connecting to %s\n", ssid);
-      hasConnected = false;
-    }
-    else if (!hasConnected) {
-      hasConnected = true;
-      Serial.print("Connected! Open http://");
-      Serial.print(WiFi.localIP());
-      Serial.println(" in your browser");
-    }
-  }
-
+  
   // EVERY_N_SECONDS(10) {
   //   Serial.print( F("Heap: ") ); Serial.println(system_get_free_heap_size());
   // }
-
   // change to a new cpt-city gradient palette
   EVERY_N_SECONDS( secondsPerPalette ) {
     gCurrentPaletteNumber = addmod8( gCurrentPaletteNumber, 1, gGradientPaletteCount);
     gTargetPalette = gGradientPalettes[ gCurrentPaletteNumber ];
   }
 
-  EVERY_N_MILLISECONDS(40) {
+  /*EVERY_N_MILLISECONDS(40) {
     // slowly blend the current palette to the next
     nblendPaletteTowardPalette( gCurrentPalette, gTargetPalette, 8);
     gHue++;  // slowly cycle the "base color" through the rainbow
-  }
+  }*/
+ 
   // Call the current pattern function once, updating the 'leds' array
 
   if (timedisp == 1 && currentPatternIndex == 30) {
     timeClient.update();
     String timeStamp = timeClient.getFormattedTime();
     Serial.println(timeStamp);
-    delay(1000);
     timeStamp.toCharArray(charBuf, 70) ;
-    if ((timeStamp.length() > 0) && (tempcount < max_dig)) {
-      for (int i = 0; i < timeStamp.length(); i++) {
-        tempvalue = charBuf[i];
-        // Serial.println(tempvalue);
-        if (tempvalue > 47 && tempvalue < 58) {
-          tempvalue = tempvalue - 48;
-        }
-        else if (tempvalue == 36) {
-          for (; tempcount < max_dig; tempcount++) {
-            toprint[tempcount] = 36;
-          }
-        }
-        else if (tempvalue == 32) {
-          tempvalue = 36;
-        }
-        else if (tempvalue == 58) {
-          tempvalue = 37;
-        }
-        if (tempcount < max_dig) {
-          toprint[tempcount] = tempvalue;
-          Serial.print(toprint[tempcount]);
-          tempcount++;
-        }
-      }
-    }
-    if (tempcount >= max_dig) {
-      tempcount = 0;
-    }
+    sendText(timeStamp);
+    delayMicroseconds(900);
   }
   if (autoplay && (millis() > autoPlayTimeout)) {
     adjustPattern(true);
@@ -859,7 +840,50 @@ void setBrightness(uint8_t value)
 
   broadcastInt("brightness", brightness);
 }
-
+void sendText(String value){
+    if ((value.length() > 0) && (tempcount < max_dig)) {
+      for (int i = 0; i < value.length(); i++) {
+        tempvalue = charBuf[i];
+        //  Serial.print(tempvalue);
+         if (tempvalue > 64) {
+          tempvalue = tempvalue - 65 + 10;
+          //Serial.print(tempvalue);
+        }
+         else if (tempvalue > 47 && tempvalue < 58) {
+          tempvalue = tempvalue - 48;
+           }   
+     //    if (tempvalue > 47) {
+       //   tempvalue = tempvalue - 48;
+          //Serial.print(tempvalue);
+        //}
+        else if (tempvalue == 36) {
+          for (; tempcount < max_dig; tempcount++) {
+            toprint[tempcount] = 36;
+          }
+        }
+        else if (tempvalue == 32) {
+          tempvalue = 36;
+        }
+        else if (tempvalue == 58) {
+          tempvalue = 37;
+        }
+        else if (tempvalue == 58) {
+          tempvalue = 37;
+        }
+        if (tempcount < max_dig) {
+          toprint[tempcount] = tempvalue;
+          Serial.print(toprint[tempcount]);
+          tempcount++;
+        }
+      }
+    }
+     if (tempcount >= max_dig) {
+      tempcount = 0;
+    }
+    if (tempcount >= 8 && timedisp==1) {
+      tempcount = 0;
+    }
+}
 void strandTest()
 {
   static uint8_t i = 0;
