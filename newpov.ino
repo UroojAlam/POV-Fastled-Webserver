@@ -397,36 +397,7 @@ void setup() {
     Serial.println(fontsize);
     webServer.sendHeader("Location", "/");
     webServer.send(302, "text/plain", "Updated-- Press Back Button");
-  /*  if ((value.length() > 0) && (tempcount < max_dig)) {
-      for (int i = 0; i < value.length(); i++) {
-        tempvalue = charBuf[i];
-        //  Serial.print(tempvalue);
-        if (tempvalue > 64) {
-          tempvalue = tempvalue - 65 + 10;
-          //Serial.print(tempvalue);
-        }
-        else if (tempvalue > 47) {
-          tempvalue = tempvalue - 48;
-          //Serial.print(tempvalue);
-        }
-        else if (tempvalue == 36) {
-          for (; tempcount < max_dig; tempcount++) {
-            toprint[tempcount] = 36;
-          }
-        }
-        else if (tempvalue == 32) {
-          tempvalue = 36;
-        }
-        if (tempcount < max_dig) {
-          toprint[tempcount] = tempvalue;
-          Serial.print(toprint[tempcount]);
-          tempcount++;
-        }
-      }
-    }
-    if (tempcount >= max_dig) {
-      tempcount = 0;
-    }*/
+ 
   });
   webServer.on("/power", HTTP_POST, []() {
     String value = webServer.arg("value");
@@ -590,14 +561,125 @@ void broadcastString(String name, String value)
 }
 
 void loop() {
-  // Add entropy to random number generator; we use a lot of it.
-  random16_add_entropy(random(65535));
-
+//Serial.println("1");
   //  dnsServer.processNextRequest();
   //  webSocketsServer.loop();
   webServer.handleClient();
+ //pov
+ if(currentPatternIndex==30){
+  //Serial.println("2");
+  if (State == HIGH ) {
+    //Serial.println("3");
+      if (timedisp == 1) {
+      //  Serial.println("4");
+    timeClient.update();
+    String timeStamp = timeClient.getFormattedTime();
+    Serial.println(timeStamp);
+    timeStamp.toCharArray(charBuf, 70) ;
+    sendText(timeStamp);
+   // delayMicroseconds(1000);
+  }
+    previous_micros1 = micros();
+    T = (previous_micros1 - previous_micros4) / 3.0;
+    dottime = T / 73000.0 * fontsize;
 
+    previous_micros4 = micros();
+    m1 = 0;
+    i1 = 0;
+    b1init = 0; b2init = 0; b3init = 0;
+    State = LOW;
+  }
+  current_micros = micros();
+
+  if (current_micros - previous_micros4 >= T) {
+    if (!b2init) {
+      i2 = 0;
+      m2 = 0;
+      b2init = 1;
+    }
+  }
+  if (current_micros - previous_micros4 >= (2 * T)) {
+    if (!b3init) {
+      i3 = 0;
+      m3 = 0;
+      b3init = 1;
+    }
+  }
+
+  if ((current_micros - previous_micros1 >= dottime) && (m1 < 48) && (i1 < 23)) {
+    printLetterb1(alpha[toprint[i1]]);
+    if (m1 >= 48) {
+      i1++;
+      m1 = 0;
+    }
+    previous_micros1 = micros();
+  }
+
+  if ((current_micros - previous_micros2 >= dottime) && (m2 < 48) && (i2 < 23)) {
+    printLetterb2(alpha[toprint[i2]]);
+    if (m2 >= 48) {
+      i2++;
+      m2 = 0;
+    }
+    previous_micros2 = micros();
+  }
+
+  if ((current_micros - previous_micros3 >= dottime) && (m3 < 48) && (i3 < 23)) {
+    printLetterb3(alpha[toprint[i3]]);
+    if (m3 >= 48) {
+      i3++;
+      m3 = 0;
+    }
+    previous_micros3 = micros();
+  }
+  lastState = State;
+  //Serial.println("5");
+ 
+ }
+ else if( currentPatternIndex!=30){
+    //Serial.println("7");
+  // Add entropy to random number generator; we use a lot of it.
+  random16_add_entropy(random(65535));
+
+  // EVERY_N_SECONDS(10) {
+  //   Serial.print( F("Heap: ") ); Serial.println(system_get_free_heap_size());
+  // }
+  
+  // change to a new cpt-city gradient palette
+  EVERY_N_SECONDS( secondsPerPalette ) {
+    //Serial.println("8");
+    gCurrentPaletteNumber = addmod8( gCurrentPaletteNumber, 1, gGradientPaletteCount);
+    gTargetPalette = gGradientPalettes[ gCurrentPaletteNumber ];
+    //Serial.println("9");
+  }
+//Serial.println("10");
+  EVERY_N_MILLISECONDS(40) {
+  //  Serial.println("11");
+    // slowly blend the current palette to the next
+    nblendPaletteTowardPalette( gCurrentPalette, gTargetPalette, 8);
+    gHue++;  // slowly cycle the "base color" through the rainbow
+  //Serial.println("12");
+  }
+ 
+  // Call the current pattern function once, updating the 'leds' array
+//Serial.println("13");
+  if (autoplay && (millis() > autoPlayTimeout)) {
+  //  Serial.println("14");
+    adjustPattern(true);
+    autoPlayTimeout = millis() + (autoplayDuration * 1000);
+ // Serial.println("15");
+  }
+  //Serial.println("16");
+  patterns[currentPatternIndex].pattern();
+
+  FastLED.show();
+//Serial.println("17");
+  // insert a delay to keep the framerate modest
+ // FastLED.delay(1000 / FRAMES_PER_SECOND);
+}
+ //Serial.println("6");
   if (power == 0) {
+   // Serial.println("7");
     fill_solid(leds, NUM_LEDS, CRGB::Black);
     fill_solid(leds1, NUM_LEDS, CRGB::Black);
     fill_solid(leds2, NUM_LEDS, CRGB::Black);
@@ -605,42 +687,6 @@ void loop() {
     // FastLED.delay(15);
     return;
   }
-  
-  // EVERY_N_SECONDS(10) {
-  //   Serial.print( F("Heap: ") ); Serial.println(system_get_free_heap_size());
-  // }
-  // change to a new cpt-city gradient palette
-  EVERY_N_SECONDS( secondsPerPalette ) {
-    gCurrentPaletteNumber = addmod8( gCurrentPaletteNumber, 1, gGradientPaletteCount);
-    gTargetPalette = gGradientPalettes[ gCurrentPaletteNumber ];
-  }
-
-  /*EVERY_N_MILLISECONDS(40) {
-    // slowly blend the current palette to the next
-    nblendPaletteTowardPalette( gCurrentPalette, gTargetPalette, 8);
-    gHue++;  // slowly cycle the "base color" through the rainbow
-  }*/
- 
-  // Call the current pattern function once, updating the 'leds' array
-
-  if (timedisp == 1 && currentPatternIndex == 30) {
-    timeClient.update();
-    String timeStamp = timeClient.getFormattedTime();
-    Serial.println(timeStamp);
-    timeStamp.toCharArray(charBuf, 70) ;
-    sendText(timeStamp);
-    delayMicroseconds(900);
-  }
-  if (autoplay && (millis() > autoPlayTimeout)) {
-    adjustPattern(true);
-    autoPlayTimeout = millis() + (autoplayDuration * 1000);
-  }
-  patterns[currentPatternIndex].pattern();
-
-  FastLED.show();
-
-  // insert a delay to keep the framerate modest
- // FastLED.delay(1000 / FRAMES_PER_SECOND);
 }
 
 void loadSettings()
@@ -867,9 +913,6 @@ void sendText(String value){
         else if (tempvalue == 58) {
           tempvalue = 37;
         }
-        else if (tempvalue == 58) {
-          tempvalue = 37;
-        }
         if (tempcount < max_dig) {
           toprint[tempcount] = tempvalue;
           Serial.print(toprint[tempcount]);
@@ -880,7 +923,7 @@ void sendText(String value){
      if (tempcount >= max_dig) {
       tempcount = 0;
     }
-    if (tempcount >= 8 && timedisp==1) {
+     if (tempcount >= 8 && timedisp==1) {
       tempcount = 0;
     }
 }
@@ -908,62 +951,7 @@ void showSolidColor()
 }
 void showPOV()
 {
-  //pov
-  if (State == HIGH) {
-    previous_micros1 = micros();
-    T = (previous_micros1 - previous_micros4) / 3.0;
-    dottime = T / 73000.0 * fontsize;
-
-    previous_micros4 = micros();
-    m1 = 0;
-    i1 = 0;
-    b1init = 0; b2init = 0; b3init = 0;
-    State = LOW;
-  }
-  current_micros = micros();
-
-  if (current_micros - previous_micros4 >= T) {
-    if (!b2init) {
-      i2 = 0;
-      m2 = 0;
-      b2init = 1;
-    }
-  }
-  if (current_micros - previous_micros4 >= (2 * T)) {
-    if (!b3init) {
-      i3 = 0;
-      m3 = 0;
-      b3init = 1;
-    }
-  }
-
-  if ((current_micros - previous_micros1 >= dottime) && (m1 < 48) && (i1 < 23)) {
-    printLetterb1(alpha[toprint[i1]]);
-    if (m1 >= 48) {
-      i1++;
-      m1 = 0;
-    }
-    previous_micros1 = micros();
-  }
-
-  if ((current_micros - previous_micros2 >= dottime) && (m2 < 48) && (i2 < 23)) {
-    printLetterb2(alpha[toprint[i2]]);
-    if (m2 >= 48) {
-      i2++;
-      m2 = 0;
-    }
-    previous_micros2 = micros();
-  }
-
-  if ((current_micros - previous_micros3 >= dottime) && (m3 < 48) && (i3 < 23)) {
-    printLetterb3(alpha[toprint[i3]]);
-    if (m3 >= 48) {
-      i3++;
-      m3 = 0;
-    }
-    previous_micros3 = micros();
-  }
-  lastState = State;
+ 
 }
 void printLetterb1(bool letter[])
 {
