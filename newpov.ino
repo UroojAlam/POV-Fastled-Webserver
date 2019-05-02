@@ -116,7 +116,7 @@ void sendText();
 #define MILLI_AMPS         2000 // IMPORTANT: set the max milli-Amps of your power supply (4A = 4000mA)
 #define FRAMES_PER_SECOND  120  // here you can control the speed. With the Access Point / Web Server the animations run a bit slower.
 
-const bool apMode = false;
+bool apMode = true;
 
 #include "Secrets.h" // this file is intentionally not included in the sketch, so nobody accidentally commits their secret information.
 // create a Secrets.h file with the following:
@@ -330,7 +330,7 @@ void setup() {
   //disabled due to https://github.com/jasoncoon/esp8266-fastled-webserver/issues/62
   //initializeWiFi();
 
-  if (apMode)
+  if (apMode == true)
   {
     WiFi.mode(WIFI_AP);
 
@@ -341,7 +341,7 @@ void setup() {
     String macID = String(mac[WL_MAC_ADDR_LENGTH - 2], HEX) +
                    String(mac[WL_MAC_ADDR_LENGTH - 1], HEX);
     macID.toUpperCase();
-    String AP_NameString = "ESP8266 Thing " + macID;
+    String AP_NameString = "POV Display " + macID;
 
     char AP_NameChar[AP_NameString.length() + 1];
     memset(AP_NameChar, 0, AP_NameString.length() + 1);
@@ -354,8 +354,8 @@ void setup() {
     Serial.printf("Connect to Wi-Fi access point: %s\n", AP_NameChar);
     Serial.println("and open http://192.168.4.1 in your browser");
   }
-  else
-  {
+  else {
+    apMode = false;
     WiFi.mode(WIFI_STA);
     Serial.printf("Connecting to %s\n", ssid);
     if (String(WiFi.SSID()) != String(ssid)) {
@@ -364,6 +364,7 @@ void setup() {
   }
 
   httpUpdateServer.setup(&webServer);
+
 
   webServer.on("/all", HTTP_GET, []() {
     String json = getFieldsJson(fields, fieldCount);
@@ -381,6 +382,12 @@ void setup() {
     String newValue = setFieldValue(name, value, fields, fieldCount);
     webServer.send(200, "text/json", newValue);
   });
+
+  webServer.on("/power", HTTP_POST, []() {
+    String value = webServer.arg("value");
+    setPower(value.toInt());
+    sendInt(power);
+  });
   webServer.on("/action_page", HTTP_GET, []() {
     String value = webServer.arg("text");
     Serial.println(value);
@@ -388,21 +395,15 @@ void setup() {
     value.toCharArray(charBuf, 70) ;
     Serial.println(value);
     sendText(value);
-    String value1 = webServer.arg("quantity"); 
+    String value1 = webServer.arg("quantity");
     Serial.println(value1);
     webServer.sendHeader("Location", "/");
     webServer.send(302, "text/plain", "Updated-- Press Back Button");
-    fontsize=value1.toInt();
+    fontsize = value1.toInt();
     Serial.println("fontsize: ");
     Serial.println(fontsize);
     webServer.sendHeader("Location", "/");
-    webServer.send(302, "text/plain", "Updated-- Press Back Button");
- 
-  });
-  webServer.on("/power", HTTP_POST, []() {
-    String value = webServer.arg("value");
-    setPower(value.toInt());
-    sendInt(power);
+    webServer.send(200, "text/plain", value);
   });
 
   webServer.on("/cooling", HTTP_POST, []() {
@@ -493,27 +494,12 @@ void setup() {
     setTimeDisplay(value.toInt());
     sendInt(timedisp);
   });
+
   webServer.on("/autoplayDuration", HTTP_POST, []() {
     String value = webServer.arg("value");
     setAutoplayDuration(value.toInt());
     sendInt(autoplayDuration);
   });
-
-  //list directory
-  webServer.on("/list", HTTP_GET, handleFileList);
-  //load editor
-  webServer.on("/edit", HTTP_GET, []() {
-    if (!handleFileRead("/edit.htm")) webServer.send(404, "text/plain", "FileNotFound");
-  });
-  //create file
-  webServer.on("/edit", HTTP_PUT, handleFileCreate);
-  //delete file
-  webServer.on("/edit", HTTP_DELETE, handleFileDelete);
-  //first callback is called after the request has ended with all parsed arguments
-  //second callback handles file uploads at that location
-  webServer.on("/edit", HTTP_POST, []() {
-    webServer.send(200, "text/plain", "");
-  }, handleFileUpload);
 
   webServer.serveStatic("/", SPIFFS, "/", "max-age=86400");
 
@@ -522,15 +508,15 @@ void setup() {
 
   static bool hasConnected = false;
   if (WiFi.status() != WL_CONNECTED) {
-      //      Serial.printf("Connecting to %s\n", ssid);
-      hasConnected = false;
-    }
-    else if(!hasConnected) {
-      hasConnected = true;
-      Serial.print("Connected! Open http://");
-      Serial.print(WiFi.localIP());
-      Serial.println(" in your browser");
-    }
+    //      Serial.printf("Connecting to %s\n", ssid);
+    hasConnected = false;
+  }
+  else if (!hasConnected) {
+    hasConnected = true;
+    Serial.print("Connected! Open http://");
+    Serial.print(WiFi.localIP());
+    Serial.println(" in your browser");
+  }
   //  webSocketsServer.begin();
   //  webSocketsServer.onEvent(webSocketEvent);
   //  Serial.println("Web socket server started");
@@ -561,131 +547,125 @@ void broadcastString(String name, String value)
 }
 
 void loop() {
-//Serial.println("1");
+  
   //  dnsServer.processNextRequest();
   //  webSocketsServer.loop();
   webServer.handleClient();
- //pov
- if(currentPatternIndex==30){
-  //Serial.println("2");
-  if (State == HIGH ) {
-    //Serial.println("3");
-      if (timedisp == 1) {
-      //  Serial.println("4");
-    timeClient.update();
-    String timeStamp = timeClient.getFormattedTime();
-    Serial.println(timeStamp);
-    timeStamp.toCharArray(charBuf, 70) ;
-    sendText(timeStamp);
-   // delayMicroseconds(1000);
-  }
-    previous_micros1 = micros();
-    T = (previous_micros1 - previous_micros4) / 3.0;
-    dottime = T / 73000.0 * fontsize;
+  //pov
+  if (currentPatternIndex == 30) {
+    //Serial.println("2");
+    if (State == HIGH ) {
+      if (timedisp == 1) {  
+        timeClient.update();
+        String timeStamp = timeClient.getFormattedTime();
+        Serial.println(timeStamp);
+        timeStamp.toCharArray(charBuf, 70) ;
+        sendText(timeStamp);
+        // delayMicroseconds(1000);
+      }
+      previous_micros1 = micros();
+      T = (previous_micros1 - previous_micros4) / 3.0;
+      dottime = T / 73000.0 * fontsize;
 
-    previous_micros4 = micros();
-    m1 = 0;
-    i1 = 0;
-    b1init = 0; b2init = 0; b3init = 0;
-    State = LOW;
-  }
-  current_micros = micros();
-
-  if (current_micros - previous_micros4 >= T) {
-    if (!b2init) {
-      i2 = 0;
-      m2 = 0;
-      b2init = 1;
-    }
-  }
-  if (current_micros - previous_micros4 >= (2 * T)) {
-    if (!b3init) {
-      i3 = 0;
-      m3 = 0;
-      b3init = 1;
-    }
-  }
-
-  if ((current_micros - previous_micros1 >= dottime) && (m1 < 48) && (i1 < 23)) {
-    printLetterb1(alpha[toprint[i1]]);
-    if (m1 >= 48) {
-      i1++;
+      previous_micros4 = micros();
       m1 = 0;
+      i1 = 0;
+      b1init = 0; b2init = 0; b3init = 0;
+      State = LOW;
     }
-    previous_micros1 = micros();
-  }
+    current_micros = micros();
 
-  if ((current_micros - previous_micros2 >= dottime) && (m2 < 48) && (i2 < 23)) {
-    printLetterb2(alpha[toprint[i2]]);
-    if (m2 >= 48) {
-      i2++;
-      m2 = 0;
+    if (current_micros - previous_micros4 >= T) {
+      if (!b2init) {
+        i2 = 0;
+        m2 = 0;
+        b2init = 1;
+      }
     }
-    previous_micros2 = micros();
-  }
-
-  if ((current_micros - previous_micros3 >= dottime) && (m3 < 48) && (i3 < 23)) {
-    printLetterb3(alpha[toprint[i3]]);
-    if (m3 >= 48) {
-      i3++;
-      m3 = 0;
+    if (current_micros - previous_micros4 >= (2 * T)) {
+      if (!b3init) {
+        i3 = 0;
+        m3 = 0;
+        b3init = 1;
+      }
     }
-    previous_micros3 = micros();
-  }
-  lastState = State;
-  //Serial.println("5");
- 
- }
- else if( currentPatternIndex!=30){
-    //Serial.println("7");
-  // Add entropy to random number generator; we use a lot of it.
-  random16_add_entropy(random(65535));
 
-  // EVERY_N_SECONDS(10) {
-  //   Serial.print( F("Heap: ") ); Serial.println(system_get_free_heap_size());
-  // }
-  
-  // change to a new cpt-city gradient palette
-  EVERY_N_SECONDS( secondsPerPalette ) {
-    //Serial.println("8");
-    gCurrentPaletteNumber = addmod8( gCurrentPaletteNumber, 1, gGradientPaletteCount);
-    gTargetPalette = gGradientPalettes[ gCurrentPaletteNumber ];
-    //Serial.println("9");
-  }
-//Serial.println("10");
-  EVERY_N_MILLISECONDS(40) {
-  //  Serial.println("11");
-    // slowly blend the current palette to the next
-    nblendPaletteTowardPalette( gCurrentPalette, gTargetPalette, 8);
-    gHue++;  // slowly cycle the "base color" through the rainbow
-  //Serial.println("12");
-  }
- 
-  // Call the current pattern function once, updating the 'leds' array
-//Serial.println("13");
-  if (autoplay && (millis() > autoPlayTimeout)) {
-  //  Serial.println("14");
-    adjustPattern(true);
-    autoPlayTimeout = millis() + (autoplayDuration * 1000);
- // Serial.println("15");
-  }
-  //Serial.println("16");
-  patterns[currentPatternIndex].pattern();
+    if ((current_micros - previous_micros1 >= dottime) && (m1 < 48) && (i1 < 23)) {
+      printLetterb1(alpha[toprint[i1]]);
+      if (m1 >= 48) {
+        i1++;
+        m1 = 0;
+      }
+      previous_micros1 = micros();
+    }
 
-  FastLED.show();
-//Serial.println("17");
-  // insert a delay to keep the framerate modest
- // FastLED.delay(1000 / FRAMES_PER_SECOND);
-}
- //Serial.println("6");
-  if (power == 0) {
-   // Serial.println("7");
+    if ((current_micros - previous_micros2 >= dottime) && (m2 < 48) && (i2 < 23)) {
+      printLetterb2(alpha[toprint[i2]]);
+      if (m2 >= 48) {
+        i2++;
+        m2 = 0;
+      }
+      previous_micros2 = micros();
+    }
+
+    if ((current_micros - previous_micros3 >= dottime) && (m3 < 48) && (i3 < 23)) {
+      printLetterb3(alpha[toprint[i3]]);
+      if (m3 >= 48) {
+        i3++;
+        m3 = 0;
+      }
+      previous_micros3 = micros();
+    }
+    lastState = State;
+    if (power == 0) {
     fill_solid(leds, NUM_LEDS, CRGB::Black);
     fill_solid(leds1, NUM_LEDS, CRGB::Black);
     fill_solid(leds2, NUM_LEDS, CRGB::Black);
     FastLED.show();
     // FastLED.delay(15);
     return;
+    }
+  }
+  else if ( currentPatternIndex != 30) {
+    
+    // Add entropy to random number generator; we use a lot of it.
+    random16_add_entropy(random(65535));
+    if (power == 0) {
+    fill_solid(leds, NUM_LEDS, CRGB::Black);
+    fill_solid(leds1, NUM_LEDS, CRGB::Black);
+    fill_solid(leds2, NUM_LEDS, CRGB::Black);
+    FastLED.show();
+    // FastLED.delay(15);
+    return;
+    }
+    // EVERY_N_SECONDS(10) {
+    //   Serial.print( F("Heap: ") ); Serial.println(system_get_free_heap_size());
+    // }
+
+    // change to a new cpt-city gradient palette
+    EVERY_N_SECONDS( secondsPerPalette ) {
+      
+      gCurrentPaletteNumber = addmod8( gCurrentPaletteNumber, 1, gGradientPaletteCount);
+      gTargetPalette = gGradientPalettes[ gCurrentPaletteNumber ];
+    }
+    EVERY_N_MILLISECONDS(40) {
+      // slowly blend the current palette to the next
+      nblendPaletteTowardPalette( gCurrentPalette, gTargetPalette, 8);
+      gHue++;  // slowly cycle the "base color" through the rainbow
+       }
+
+    // Call the current pattern function once, updating the 'leds' array
+   
+    if (autoplay && (millis() > autoPlayTimeout)) {
+      adjustPattern(true);
+      autoPlayTimeout = millis() + (autoplayDuration * 1000);
+      
+    }
+    patterns[currentPatternIndex].pattern();
+
+    FastLED.show();
+    // insert a delay to keep the framerate modest
+   //  FastLED.delay(1000 / FRAMES_PER_SECOND);
   }
 }
 
@@ -726,11 +706,12 @@ void loadSettings()
 void setPower(uint8_t value)
 {
   power = value == 0 ? 0 : 1;
-
+ 
   EEPROM.write(5, power);
   EEPROM.commit();
 
   broadcastInt("power", power);
+
 }
 
 void setAutoplay(uint8_t value)
@@ -886,46 +867,46 @@ void setBrightness(uint8_t value)
 
   broadcastInt("brightness", brightness);
 }
-void sendText(String value){
-    if ((value.length() > 0) && (tempcount < max_dig)) {
-      for (int i = 0; i < value.length(); i++) {
-        tempvalue = charBuf[i];
-        //  Serial.print(tempvalue);
-         if (tempvalue > 64) {
-          tempvalue = tempvalue - 65 + 10;
-          //Serial.print(tempvalue);
-        }
-         else if (tempvalue > 47 && tempvalue < 58) {
-          tempvalue = tempvalue - 48;
-           }   
-     //    if (tempvalue > 47) {
-       //   tempvalue = tempvalue - 48;
-          //Serial.print(tempvalue);
-        //}
-        else if (tempvalue == 36) {
-          for (; tempcount < max_dig; tempcount++) {
-            toprint[tempcount] = 36;
-          }
-        }
-        else if (tempvalue == 32) {
-          tempvalue = 36;
-        }
-        else if (tempvalue == 58) {
-          tempvalue = 37;
-        }
-        if (tempcount < max_dig) {
-          toprint[tempcount] = tempvalue;
-          Serial.print(toprint[tempcount]);
-          tempcount++;
+void sendText(String value) {
+  if ((value.length() > 0) && (tempcount < max_dig)) {
+    for (int i = 0; i < value.length(); i++) {
+      tempvalue = charBuf[i];
+      //  Serial.print(tempvalue);
+      if (tempvalue > 64) {
+        tempvalue = tempvalue - 65 + 10;
+        //Serial.print(tempvalue);
+      }
+      else if (tempvalue > 47 && tempvalue < 58) {
+        tempvalue = tempvalue - 48;
+      }
+      //    if (tempvalue > 47) {
+      //   tempvalue = tempvalue - 48;
+      //Serial.print(tempvalue);
+      //}
+      else if (tempvalue == 36) {
+        for (; tempcount < max_dig; tempcount++) {
+          toprint[tempcount] = 36;
         }
       }
+      else if (tempvalue == 32) {
+        tempvalue = 36;
+      }
+      else if (tempvalue == 58) {
+        tempvalue = 37;
+      }
+      if (tempcount < max_dig) {
+        toprint[tempcount] = tempvalue;
+        Serial.print(toprint[tempcount]);
+        tempcount++;
+      }
     }
-     if (tempcount >= max_dig) {
-      tempcount = 0;
-    }
-     if (tempcount >= 8 && timedisp==1) {
-      tempcount = 0;
-    }
+  }
+  if (tempcount >= max_dig) {
+    tempcount = 0;
+  }
+  if (tempcount >= 8 && timedisp == 1) {
+    tempcount = 0;
+  }
 }
 void strandTest()
 {
@@ -945,13 +926,13 @@ void strandTest()
 
 void showSolidColor()
 {
-  fill_solid(leds, NUM_LEDS, solidColor);  
-  fill_solid(leds1, NUM_LEDS, solidColor); 
+  fill_solid(leds, NUM_LEDS, solidColor);
+  fill_solid(leds1, NUM_LEDS, solidColor);
   fill_solid(leds2, NUM_LEDS, solidColor);
 }
 void showPOV()
 {
- 
+
 }
 void printLetterb1(bool letter[])
 {
